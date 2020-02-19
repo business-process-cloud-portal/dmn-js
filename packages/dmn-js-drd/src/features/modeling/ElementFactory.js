@@ -47,12 +47,12 @@ ElementFactory.prototype.createDrdElement = function(elementType, attrs) {
     businessObject = drdFactory.create(attrs.type);
   }
 
-  if (
-    elementType !== 'root' &&
-    elementType !== 'connection' &&
-    !businessObject.extensionElements
-  ) {
-    businessObject.extensionElements = drdFactory.createDi();
+  if (!businessObject.di) {
+    if (elementType === 'connection') {
+      businessObject.di = drdFactory.createDiEdge(businessObject, []);
+    } else if (elementType === 'shape') {
+      businessObject.di = drdFactory.createDiShape(businessObject, {});
+    }
   }
 
   size = this._getDefaultSize(businessObject);

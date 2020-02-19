@@ -1,72 +1,40 @@
 import inherits from 'inherits';
 
-import {
-  filter
-} from 'min-dash';
-
 import CommandInterceptor from 'diagram-js/lib/command/CommandInterceptor';
 
 
-export default function ReplaceConnectionBehavior(eventBus, modeling, drdRules) {
+export default function ReplaceConnectionBehavior(injector, modeling, rules) {
+  injector.invoke(CommandInterceptor, this);
 
-  CommandInterceptor.call(this, eventBus);
+  this.preExecute('connection.reconnect', function(context) {
+    var connection = context.connection,
+        source = context.newSource || connection.source,
+        target = context.newTarget || connection.target,
+        waypoints = connection.waypoints.slice();
 
-  function fixConnection(connection) {
+    var allowed = rules.allowed('connection.reconnect', {
+      connection: connection,
+      source: source,
+      target: target
+    });
 
-    var source = connection.source,
-        target = connection.target,
-        parent = connection.parent,
-        replacementAttrs;
-
-    // do not do anything if connection
-    // is already deleted (may happen due to other
-    // behaviors plugged-in before)
-    if (!parent) {
+    if (!allowed || allowed.type === connection.type) {
       return;
     }
 
-    replacementAttrs = drdRules.canConnect(source, target) || { type: 'dmn:Association' };
-    replacementAttrs.waypoints = connection.waypoints.slice();
+    context.connection = modeling.connect(source, target, {
+      type: allowed.type,
+      waypoints: waypoints
+    });
 
-    // create a new connection
     modeling.removeConnection(connection);
-    modeling.connect(source, target, replacementAttrs);
-  }
-
-  this.postExecuted('connection.reconnectStart', function(event) {
-
-    // remove old di information from target
-    var extensionElements =
-      event.context.connection.target.businessObject.extensionElements.values;
-
-    var extension = filter(extensionElements, function(extension) {
-      return (
-        extension.$type === 'biodi:Edge' &&
-        extension.source === event.context.oldSource.id
-      );
-    })[0];
-
-    if (extension) {
-      extensionElements.splice(extensionElements.indexOf(extension), 1);
-    }
-  });
-
-  this.postExecuted([
-    'connection.reconnectStart',
-    'connection.reconnectEnd'
-  ], function(event) {
-
-    var connection = event.context.connection;
-
-    fixConnection(connection);
-  });
-
+  }, true);
 }
 
 inherits(ReplaceConnectionBehavior, CommandInterceptor);
 
 ReplaceConnectionBehavior.$inject = [
-  'eventBus',
+  'injector',
   'modeling',
-  'drdRules'
+  'rules'
 ];

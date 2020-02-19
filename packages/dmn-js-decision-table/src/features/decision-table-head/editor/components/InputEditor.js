@@ -1,16 +1,17 @@
 import { Component } from 'inferno';
 
-import { isString } from 'min-dash';
-
 import ContentEditable from 'dmn-js-shared/lib/components/ContentEditable';
 import Input from 'dmn-js-shared/lib/components/Input';
 import InputSelect from 'dmn-js-shared/lib/components/InputSelect';
-
 
 export default class InputEditor extends Component {
 
   constructor(props, context) {
     super(props, context);
+
+    this.translate = context.injector ? context.injector.get('translate') : noopTranslate;
+
+    const defaultExpressionLanguage = props.defaultExpressionLanguage.value;
 
     this.setExpressionLanguage = (expressionLanguage) => {
       this.handleChange({ expressionLanguage });
@@ -20,7 +21,7 @@ export default class InputEditor extends Component {
       event.preventDefault();
       event.stopPropagation();
 
-      this.setExpressionLanguage('FEEL');
+      this.setExpressionLanguage(defaultExpressionLanguage);
     };
 
     this.handleValue = (text) => {
@@ -30,10 +31,10 @@ export default class InputEditor extends Component {
       let change = { text };
 
       if (isMultiLine(text) && !expressionLanguage) {
-        change.expressionLanguage = 'FEEL';
+        change.expressionLanguage = defaultExpressionLanguage;
       }
 
-      if (!isMultiLine(text) && expressionLanguage === 'FEEL') {
+      if (!isMultiLine(text) && expressionLanguage === defaultExpressionLanguage) {
         change.expressionLanguage = undefined;
       }
 
@@ -59,6 +60,7 @@ export default class InputEditor extends Component {
 
       this.handleChange({ inputVariable });
     };
+
   }
 
   handleChange(changes) {
@@ -72,27 +74,39 @@ export default class InputEditor extends Component {
   render() {
 
     const {
+      defaultExpressionLanguage,
       expressionLanguage,
+      expressionLanguages,
       inputVariable,
       label,
       text
     } = this.props;
 
-    var editScript = expressionLanguage || isMultiLine(text);
-
-    var languageOptions = [
-      !isMultiLine(text) && '',
-      'FEEL',
-      'JUEL',
-      'JavaScript',
-      'Groovy',
-      'Python'
-    ].filter(isString).map(o => ({ label: o, value: o }));
+    const editScript = expressionLanguage || isMultiLine(text);
 
     return (
       <div className="dms-container ref-input-editor">
 
-        <h4 className="dms-heading">Input Expression</h4>
+        <p className="dms-fill-row">
+          <label className="dms-label">
+            {
+              this.translate('Input Label')
+            }
+          </label>
+
+          <Input
+            className="ref-input-label"
+            value={ label || '' }
+            onInput={ this.handleLabelChange } />
+        </p>
+
+        <hr className="dms-hrule" />
+
+        <h4 className="dms-heading">
+          {
+            this.translate('Input Expression')
+          }
+        </h4>
 
         <ContentEditable
           placeholder="enter expression"
@@ -110,12 +124,23 @@ export default class InputEditor extends Component {
 
         {
           !editScript && (
+
+            // TODO @barmac: Replace with proper i18n tooling
             <p className="dms-hint">
-              Enter simple <code>FEEL</code> expression or <a href="#"
+              {
+                this.translate('Enter simple')
+              }
+              <code>{ defaultExpressionLanguage.label }</code>
+              {
+                this.translate('expression or')
+              }
+              <button type="button"
                 className="ref-make-script"
                 onClick={ this.makeScript }>
-                  change to script
-              </a>.
+                {
+                  this.translate('change to script.')
+                }
+              </button>.
             </p>
           )
         }
@@ -123,7 +148,9 @@ export default class InputEditor extends Component {
         {
           editScript && (
             <p className="dms-hint">
-              Enter script.
+              {
+                this.translate('Enter script.')
+              }
             </p>
           )
         }
@@ -131,36 +158,33 @@ export default class InputEditor extends Component {
         {
           editScript && (
             <p>
-              <label className="dms-label">Expression Language</label>
+              <label className="dms-label">
+                {
+                  this.translate('Expression Language')
+                }
+              </label>
 
               <InputSelect
                 className="ref-language"
                 value={ expressionLanguage || '' }
                 onChange={ this.handleLanguageChange }
-                options={ languageOptions } />
+                options={ expressionLanguages } />
             </p>
           )
         }
 
-        <hr className="dms-hrule" />
-
         <p className="dms-fill-row">
-          <label className="dms-label">Input Label</label>
-
-          <Input
-            className="ref-input-label"
-            value={ label || '' }
-            onInput={ this.handleLabelChange } />
-        </p>
-
-        <p className="dms-fill-row">
-          <label className="dms-label">Input Variable</label>
+          <label className="dms-label">
+            {
+              this.translate('Input Variable')
+            }
+          </label>
 
           <Input
             className="ref-input-variable"
             value={ inputVariable || '' }
             onInput={ this.handleInputVariableChange }
-            placeholder="cellInput" />
+            placeholder={ this.translate('cellInput') } />
         </p>
       </div>
     );
@@ -171,4 +195,8 @@ export default class InputEditor extends Component {
 
 function isMultiLine(text) {
   return text && text.split(/\n/).length > 1;
+}
+
+function noopTranslate(str) {
+  return str;
 }

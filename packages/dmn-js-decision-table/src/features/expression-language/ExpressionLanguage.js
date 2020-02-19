@@ -4,29 +4,11 @@ import InputSelect from 'dmn-js-shared/lib/components/InputSelect';
 
 import { isInput } from 'dmn-js-shared/lib/util/ModelUtil';
 
-const INPUT_EXPRESSION_LANGUAGE_OPTIONS = [{
-  label: 'FEEL',
-  value: 'feel'
-}, {
-  label: 'JUEL',
-  value: 'juel'
-}, {
-  label: 'JavaScript',
-  value: 'javascript'
-}, {
-  label: 'Groovy',
-  value: 'groovy'
-}, {
-  label: 'Python',
-  value: 'python'
-}, {
-  label: 'JRuby',
-  value: 'jruby'
-}];
 
 export default class ExpressionLanguage {
-  constructor(components, elementRegistry, modeling) {
+  constructor(components, elementRegistry, modeling, expressionLanguages, translate) {
     this._modeling = modeling;
+    this._translate = translate;
 
     components.onGetComponent('context-menu-cell-additional', (context = {}) => {
       if (context.contextMenuType && context.contextMenuType === 'context-menu') {
@@ -45,20 +27,22 @@ export default class ExpressionLanguage {
         }
 
         const expressionLanguage = element.businessObject.expressionLanguage
-          || (isInput(element.col) ? 'feel' : 'juel');
+          || expressionLanguages.getDefault(isInput(element.col) ? 'inputCell' : 'outputCell').value;
+
+        const options = expressionLanguages.getAll();
 
         return (
           <div
             className="context-menu-group-entry context-menu-entry-set-expression-language">
             <div>
               <span className="context-menu-group-entry-icon dmn-icon-file-code"></span>
-              Expression Language
+              { this._translate('Expression Language') }
             </div>
 
             <InputSelect
               className="expression-language"
               onChange={ value => this.onChange(element, value) }
-              options={ INPUT_EXPRESSION_LANGUAGE_OPTIONS }
+              options={ options }
               value={ expressionLanguage } />
 
           </div>
@@ -73,4 +57,10 @@ export default class ExpressionLanguage {
   }
 }
 
-ExpressionLanguage.$inject = [ 'components', 'elementRegistry', 'modeling' ];
+ExpressionLanguage.$inject = [
+  'components',
+  'elementRegistry',
+  'modeling',
+  'expressionLanguages',
+  'translate'
+];

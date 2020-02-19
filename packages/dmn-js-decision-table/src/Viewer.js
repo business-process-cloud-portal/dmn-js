@@ -9,6 +9,8 @@ import {
   remove as domRemove
 } from 'min-dom';
 
+import TranslateModule from 'diagram-js/lib/i18n/translate';
+
 import annotationsModule from './features/annotations';
 import coreModule from './core';
 import decisionTableHeadModule from './features/decision-table-head';
@@ -43,6 +45,7 @@ export default class Viewer extends Table {
     try {
 
       if (this._decision) {
+
         // clear existing rendered diagram
         this.clear();
       }
@@ -185,6 +188,7 @@ export default class Viewer extends Table {
     return [
       annotationsModule,
       coreModule,
+      TranslateModule,
       decisionTableHeadModule,
       decisionTablePropertiesModule,
       decisionRuleIndicesModule,

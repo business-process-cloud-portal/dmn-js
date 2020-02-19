@@ -24,6 +24,7 @@ describe('decision-table-head/editor - InputEditor', function() {
 
 
   it('should render', function() {
+
     // when
     const tree = renderIntoDocument(
       <Root />
@@ -44,6 +45,11 @@ class Root extends Component {
     this.state = {
       text: '',
       expressionLanguage: '',
+      expressionLanguages: [],
+      defaultExpressionLanguage: {
+        value: 'feel',
+        label: 'FEEL'
+      },
       inputVariable: null,
       label: null
     };

@@ -1,121 +1,104 @@
 import {
   assign,
-  map,
-  forEach,
-  pick
+  forEach
 } from 'min-dash';
 
 import inherits from 'inherits';
 
 import {
-  remove as collectionRemove
+  remove as collectionRemove,
+  add as collectionAdd
 } from 'diagram-js/lib/util/Collections';
 
 import {
-  getBusinessObject,
-  is
+  is,
+  isAny
 } from 'dmn-js-shared/lib/util/ModelUtil';
 
 import CommandInterceptor from 'diagram-js/lib/command/CommandInterceptor';
 
 
 /**
- * A command interceptor responsible for updating elements after they've
- * been changed in the DRD view.
+ * Update DMN 1.3 information.
  */
 export default function DrdUpdater(
-    eventBus,
-    drdFactory,
     connectionDocking,
+    definitionPropertiesView,
+    drdFactory,
     drdRules,
-    definitionPropertiesView) {
+    injector
+) {
+  injector.invoke(CommandInterceptor, this);
 
-  CommandInterceptor.call(this, eventBus);
-
+  this._definitionPropertiesView = definitionPropertiesView;
   this._drdFactory = drdFactory;
   this._drdRules = drdRules;
-  this._definitionPropertiesView = definitionPropertiesView;
 
   var self = this;
 
+  function cropConnection(context) {
+    var connection = context.connection,
+        cropped = context.cropped;
 
-  // connection cropping //////////////////////
-
-  // crop connection ends during create/update
-  function cropConnection(e) {
-    var context = e.context,
-        connection;
-
-    if (!context.cropped) {
-      connection = context.connection;
+    if (!cropped) {
       connection.waypoints = connectionDocking.getCroppedWaypoints(connection);
+
       context.cropped = true;
     }
   }
 
   this.executed([
-    'connection.layout',
     'connection.create',
-    'connection.reconnectEnd',
-    'connection.reconnectStart'
-  ], cropConnection);
+    'connection.layout'
+  ], cropConnection, true);
 
-  this.reverted([ 'connection.layout' ], function(e) {
-    delete e.context.cropped;
-  });
+  this.reverted([ 'connection.layout' ], function(context) {
+    delete context.cropped;
+  }, true);
 
+  function updateParent(context) {
+    var connection = context.connection,
+        parent = context.parent,
+        shape = context.shape;
 
-  // DRD + DI update //////////////////////
-
-  // update parent
-  function updateParent(e) {
-    var context = e.context,
-        element = context.shape || context.connection,
-        oldParent = context.oldParent;
-
-    // for all requirements the semantic parent is the target
-    if (context.connection && !is(element, 'dmn:Association')) {
-      oldParent = element.target;
+    if (connection && !is(connection, 'dmn:Association')) {
+      parent = connection.target;
     }
 
-    self.updateParent(element, oldParent);
+    self.updateParent(shape || connection, parent);
   }
 
-  function reverseUpdateParent(e) {
-    var context = e.context;
+  function reverseUpdateParent(context) {
+    var connection = context.connection,
+        shape = context.shape;
 
-    var element = context.shape || context.connection,
-        // oldParent is the (old) new parent, because we are undoing
-        oldParent = context.parent || context.newParent;
+    var oldParent = context.parent || context.newParent;
 
-    // for all requirements the semantic parent is the target
-    if (context.connection && !is(element, 'dmn:Association')) {
-      oldParent = element.target;
+    if (connection && !is(connection, 'dmn:Association')) {
+      oldParent = connection.target;
     }
 
-    self.updateParent(element, oldParent);
+    self.updateParent(shape || connection, oldParent);
   }
 
   this.executed([
-    'shape.create',
-    'shape.delete',
     'connection.create',
+    'connection.delete',
     'connection.move',
-    'connection.delete'
-  ], updateParent);
+    'shape.create',
+    'shape.delete'
+  ], updateParent, true);
 
   this.reverted([
-    'shape.create',
-    'shape.delete',
     'connection.create',
+    'connection.delete',
     'connection.move',
-    'connection.delete'
-  ], reverseUpdateParent);
+    'shape.create',
+    'shape.delete'
+  ], reverseUpdateParent, true);
 
-
-  // update bounds
-  function updateBounds(e) {
-    var shape = e.context.shape;
+  function updateBounds(context) {
+    var shape = context.shape;
 
     if (!(is(shape, 'dmn:DRGElement') || is(shape, 'dmn:TextAnnotation'))) {
       return;
@@ -124,266 +107,202 @@ export default function DrdUpdater(
     self.updateBounds(shape);
   }
 
-  this.executed([ 'shape.create', 'shape.move' ], updateBounds);
+  this.executed([ 'shape.create', 'shape.move' ], updateBounds, true);
 
-  this.reverted([ 'shape.create', 'shape.move' ], updateBounds);
+  this.reverted([ 'shape.create', 'shape.move' ], updateBounds, true);
 
-  function updateConnectionWaypoints(e) {
-    self.updateConnectionWaypoints(e.context);
+  function updateConnectionWaypoints(context) {
+    self.updateConnectionWaypoints(context);
   }
 
   this.executed([
+    'connection.create',
     'connection.layout',
-    'connection.updateWaypoints',
-    'connection.move'
-  ], updateConnectionWaypoints);
+    'connection.move',
+    'connection.updateWaypoints'
+  ], updateConnectionWaypoints, true);
 
   this.reverted([
+    'connection.create',
     'connection.layout',
-    'connection.updateWaypoints',
-    'connection.move'
-  ], updateConnectionWaypoints);
+    'connection.move',
+    'connection.updateWaypoints'
+  ], updateConnectionWaypoints, true);
 
-  this.executed([ 'connection.create' ], function(event) {
-    var context = event.context,
-        connection = context.connection,
-        targetBO = context.target.businessObject,
-        di, ext;
+  this.executed('connection.create', function(context) {
+    var connection = context.connection,
+        connectionBo = connection.businessObject,
+        di = connectionBo.di,
+        target = context.target,
+        targetBo = target.businessObject;
 
     if (is(connection, 'dmn:Association')) {
-      updateParent(event);
+      updateParent(context);
     } else {
-      // semantic parent is target (instead of graphical parent)
-      self.updateSemanticParent(connection.businessObject, targetBO);
 
-      // add di to target business object extension elements
-      di = context.di;
-      ext = targetBO.extensionElements.values;
+      // parent is target
+      self.updateSemanticParent(connectionBo, targetBo);
 
-      // fix di waypoints, due to connection cropping
-      forEach(di.waypoints, function(waypoint, index) {
-        waypoint.x = connection.waypoints[index].x;
-        waypoint.y = connection.waypoints[index].y;
+      // fix DI waypoints after connection cropping
+      forEach(di.waypoint, function(waypoint, index) {
+        waypoint.x = connection.waypoints[ index ].x;
+        waypoint.y = connection.waypoints[ index ].y;
       });
-
-      ext.push(di);
     }
-  });
+  }, true);
 
-  this.reverted([ 'connection.create' ], function(event) {
-    var context = event.context,
-        connection = context.connection,
-        di, ext, idx;
+  this.reverted('connection.create', function(context) {
+    reverseUpdateParent(context);
+  }, true);
 
-    reverseUpdateParent(event);
+  this.executed('connection.reconnect', function(context) {
+    var connection = context.connection,
+        connectionBo = connection.businessObject,
+        newTarget = context.newTarget,
+        newTargetBo = newTarget.businessObject;
 
-    if (!is(connection, 'dmn:Association')) {
-      // remove di from target business object extension elements
-      di = context.di;
-      ext = context.target.businessObject.extensionElements.values;
-      idx = ext.indexOf(di);
+    self.updateSemanticParent(connectionBo, newTargetBo);
+  }, true);
 
-      if (idx !== -1) {
-        ext.splice(idx, 1);
-      }
-    }
-  });
+  this.reverted('connection.reconnect', function(context) {
+    var connection = context.connection,
+        connectionBo = connection.businessObject,
+        oldTarget = context.oldTarget,
+        oldTargetBo = oldTarget.businessObject;
 
-  this.executed([ 'connection.delete' ], function(event) {
-    var context = event.context,
-        connection = getBusinessObject(context.connection),
-        source = context.source,
-        target = getBusinessObject(context.target),
-        index;
+    self.updateSemanticParent(connectionBo, oldTargetBo);
+  }, true);
 
-    if (is(connection, 'dmn:Association')) {
-      return;
-    }
-
-    forEach(target.extensionElements.values, function(value, idx) {
-      if (is(value, 'biodi:Edge') && source.id === value.source) {
-        index = idx;
-
-        return false;
-      }
-    });
-
-    if (index !== undefined) {
-      context.oldDI = target.extensionElements.values[index];
-
-      target.extensionElements.values.splice(index, 1);
-    }
-  });
-
-  this.reverted([ 'connection.delete' ], function(event) {
-    var context = event.context,
-        connection = context.connection,
-        target = getBusinessObject(context.target),
-        oldDI = context.oldDI;
-
-    if (!oldDI || is(connection, 'dmn:Association')) {
-      return;
-    }
-
-    target.extensionElements.values.push(oldDI);
-  });
-
-  this.executed([ 'element.updateProperties' ], function(event) {
+  this.executed('element.updateProperties', function(context) {
     definitionPropertiesView.update();
-  });
-  this.reverted([ 'element.updateProperties' ], function(event) {
+  }, true);
+
+  this.reverted('element.updateProperties', function(context) {
     definitionPropertiesView.update();
-  });
-
-
-  this.reverted(['connection.reconnectEnd'], function(event) {
-    self.updateSemanticParent(
-      event.context.connection.businessObject,
-      event.context.oldTarget.businessObject
-    );
-  });
+  }, true);
 
 }
 
 inherits(DrdUpdater, CommandInterceptor);
 
 DrdUpdater.$inject = [
-  'eventBus',
-  'drdFactory',
   'connectionDocking',
+  'definitionPropertiesView',
+  'drdFactory',
   'drdRules',
-  'definitionPropertiesView'
+  'injector'
 ];
 
+DrdUpdater.prototype.updateBounds = function(shape) {
+  var businessObject = shape.businessObject,
+      bounds = businessObject.di.bounds;
 
-// implementation //////////////////////
+  // update bounds
+  assign(bounds, {
+    x: shape.x,
+    y: shape.y,
+    width: shape.width,
+    height: shape.height
+  });
+};
+
+DrdUpdater.prototype.updateConnectionWaypoints = function(context) {
+  var drdFactory = this._drdFactory;
+
+  var connection = context.connection,
+      businessObject = connection.businessObject,
+      edge = businessObject.di;
+
+  edge.waypoint = drdFactory.createDiWaypoints(connection.waypoints)
+    .map(function(waypoint) {
+      waypoint.$parent = edge;
+
+      return waypoint;
+    });
+};
 
 DrdUpdater.prototype.updateParent = function(element, oldParent) {
-  var parentShape = element.parent;
+  var parent = element.parent;
 
   if (!is(element, 'dmn:DRGElement') && !is(element, 'dmn:Artifact')) {
-    parentShape = oldParent;
+    parent = oldParent;
   }
 
   var businessObject = element.businessObject,
-      parentBusinessObject = parentShape && parentShape.businessObject;
+      parentBo = parent && parent.businessObject;
 
-  this.updateSemanticParent(businessObject, parentBusinessObject);
+  this.updateSemanticParent(businessObject, parentBo);
 
-  this.updateExtensionElements(businessObject);
+  this.updateDiParent(businessObject.di, parentBo && parentBo.di);
 };
 
+DrdUpdater.prototype.updateSemanticParent = function(businessObject, parent) {
+  var children,
+      containment;
 
-DrdUpdater.prototype.updateBounds = function(shape) {
-  var drdFactory = this._drdFactory;
-
-  var businessObject = getBusinessObject(shape),
-      extensionElements = businessObject.extensionElements,
-      values, bounds;
-
-  if (!extensionElements) {
+  if (businessObject.$parent === parent) {
     return;
   }
 
-  values = extensionElements.values;
-  bounds = values[0];
-
-  if (!bounds) {
-    values.push(drdFactory.createDiBounds({
-      x: shape.x,
-      y: shape.y,
-      width: shape.width,
-      height: shape.height
-    }));
-  } else {
-    values[0] = assign(bounds, {
-      x: shape.x,
-      y: shape.y,
-      width: shape.width,
-      height: shape.height
-    });
-  }
-};
-
-
-DrdUpdater.prototype.updateExtensionElements = function(businessObject) {
-  var extensionElements = businessObject.extensionElements;
-
-  if (extensionElements && !extensionElements.$parent) {
-    extensionElements.$parent = businessObject;
-  }
-};
-
-
-DrdUpdater.prototype.updateSemanticParent = function(businessObject, newParent) {
-
-  var containment, children;
-
-  if (businessObject.$parent === newParent) {
-    return;
-  }
-
-  if (businessObject.$instanceOf('dmn:DRGElement')) {
-    containment = 'drgElements';
-  } else if (businessObject.$instanceOf('dmn:Artifact')) {
-    containment = 'artifacts';
-  } else if (businessObject.$instanceOf('dmn:InformationRequirement')) {
+  if (is(businessObject, 'dmn:DRGElement')) {
+    containment = 'drgElement';
+  } else if (is(businessObject, 'dmn:Artifact')) {
+    containment = 'artifact';
+  } else if (is(businessObject, 'dmn:InformationRequirement')) {
     containment = 'informationRequirement';
-  } else if (businessObject.$instanceOf('dmn:AuthorityRequirement')) {
+  } else if (is(businessObject, 'dmn:AuthorityRequirement')) {
     containment = 'authorityRequirement';
-  } else if (businessObject.$instanceOf('dmn:KnowledgeRequirement')) {
+  } else if (is(businessObject, 'dmn:KnowledgeRequirement')) {
     containment = 'knowledgeRequirement';
   }
 
   if (businessObject.$parent) {
+
     // remove from old parent
     children = businessObject.$parent.get(containment);
 
     collectionRemove(children, businessObject);
   }
 
-  if (!newParent) {
-    businessObject.$parent = null;
-  } else {
+  if (parent) {
+
     // add to new parent
-    children = newParent.get(containment);
+    children = parent.get(containment);
+
     if (children) {
       children.push(businessObject);
-      businessObject.$parent = newParent;
+
+      businessObject.$parent = parent;
     }
+  } else {
+    businessObject.$parent = null;
   }
 };
 
+DrdUpdater.prototype.updateDiParent = function(di, parentDi) {
 
-DrdUpdater.prototype.updateConnectionWaypoints = function(context) {
-  var drdFactory = this._drdFactory;
-
-  var connection = context.connection,
-      source = connection.source,
-      target = connection.target,
-      extensionElements;
-
-  if (is(connection, 'dmn:Association')) {
-    extensionElements = connection.businessObject.extensionElements;
-  } else {
-    extensionElements = target.businessObject.extensionElements;
+  if (di.$parent === parentDi) {
+    return;
   }
 
-  // update di -> target extensionElements
-  extensionElements.values = map(extensionElements.values, function(value) {
+  if (isAny(di, [ 'dmndi:DMNEdge', 'dmndi:DMNShape' ])) {
 
-    if (is(value, 'biodi:Edge') && value.source === source.id) {
-      value.waypoints = [];
-
-      forEach(connection.waypoints, function(waypoint, index) {
-        var semanticWaypoint = drdFactory.createDiWaypoint(pick(waypoint, [ 'x', 'y' ]));
-
-        semanticWaypoint.$parent = value;
-
-        value.waypoints.push(semanticWaypoint);
-      });
+    var diagram = parentDi || di;
+    while (!is(diagram, 'dmndi:DMNDiagram')) {
+      diagram = diagram.$parent;
     }
 
-    return value;
-  });
+    var diagramElements = diagram.get('diagramElements');
+    if (parentDi) {
+      di.$parent = diagram;
+
+      collectionAdd(diagramElements, di);
+    } else {
+      di.$parent = null;
+
+      collectionRemove(diagramElements, di);
+    }
+  } else {
+    throw new Error('unsupported');
+  }
 };

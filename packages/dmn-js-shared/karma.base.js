@@ -1,5 +1,7 @@
 'use strict';
 
+var coverage = process.env.COVERAGE;
+
 // configures browsers to run test against
 // any of [ 'ChromeHeadless', 'Chrome', 'Firefox', 'IE' ]
 var browsers = (
@@ -20,6 +22,7 @@ var browsers = (
     })
 );
 
+const testFile = coverage ? 'test/coverageBundle.js' : 'test/testBundle.js';
 
 module.exports = function(path) {
 
@@ -34,11 +37,11 @@ module.exports = function(path) {
       ],
 
       files: [
-        'test/testBundle.js'
+        testFile
       ],
 
       preprocessors: {
-        'test/testBundle.js': [ 'webpack' ]
+        [testFile]: [ 'webpack' ]
       },
 
       customLaunchers: {
@@ -52,7 +55,13 @@ module.exports = function(path) {
         }
       },
 
-      reporters: [ 'spec' ],
+      reporters: [ 'progress' ].concat(coverage ? 'coverage' : []),
+
+      coverageReporter: {
+        reporters: [
+          { type: 'lcovonly', subdir: '.' },
+        ]
+      },
 
       browsers: browsers,
 
@@ -74,7 +83,18 @@ module.exports = function(path) {
               test: /\.css|\.dmn$/,
               use: 'raw-loader'
             }
-          ]
+          ].concat(coverage ?
+            {
+              test: /\.js$/,
+              use: {
+                loader: 'istanbul-instrumenter-loader',
+                options: { esModules: true }
+              },
+              enforce: 'post',
+              include: /src\.*/,
+              exclude: /node_modules/
+            } : []
+          )
         },
         resolve: {
           mainFields: [
@@ -87,7 +107,8 @@ module.exports = function(path) {
             'node_modules',
             path
           ]
-        }
+        },
+        devtool: 'eval-source-map'
       }
     });
   };

@@ -1,6 +1,8 @@
 src
 test
 !lib
+!core
 .babelrc
 karma.base.js
 karma.conf.js
+coverage

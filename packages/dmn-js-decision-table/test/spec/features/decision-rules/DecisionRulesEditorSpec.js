@@ -9,6 +9,7 @@ import { queryEditor } from 'dmn-js-shared/test/util/EditorUtil';
 import TestContainer from 'mocha-test-container-support';
 
 import simpleXML from '../../simple.dmn';
+import emptyRuleXML from './empty-rule.dmn';
 import languageExpressionXML from '../../expression-language.dmn';
 
 import CoreModule from 'src/core';
@@ -186,10 +187,10 @@ describe('features/decision-rules', function() {
 
       describe('on input', function() {
 
-        it('should not default', function() {
+        it('should not display default', function() {
 
           // given
-          const cell = domQuery('[data-element-id="inputEntry1"]', testContainer);
+          const cell = domQuery('[data-element-id="inputEntry2"]', testContainer);
 
           // then
           expect(domQuery('.dmn-expression-language', cell)).to.not.exist;
@@ -199,7 +200,7 @@ describe('features/decision-rules', function() {
         it('should display non-default', function() {
 
           // given
-          const cell = domQuery('[data-element-id="inputEntry2"]', testContainer);
+          const cell = domQuery('[data-element-id="inputEntry1"]', testContainer);
 
           // then
           expect(domQuery('.dmn-expression-language', cell)).to.exist;
@@ -209,9 +210,9 @@ describe('features/decision-rules', function() {
         it('should not display if focussed', function() {
 
           // given
-          const cell = domQuery('[data-element-id="inputEntry2"]', testContainer);
+          const cell = domQuery('[data-element-id="inputEntry1"]', testContainer);
 
-          const editor = queryEditor('[data-element-id="inputEntry2"]', testContainer);
+          const editor = queryEditor('[data-element-id="inputEntry1"]', testContainer);
 
           // when
           editor.focus();
@@ -262,6 +263,41 @@ describe('features/decision-rules', function() {
       });
 
     });
+
+  });
+
+
+  describe('placeholder', function() {
+
+    beforeEach(bootstrapModeler(emptyRuleXML, {
+      modules: [
+        CoreModule,
+        ModelingModule,
+        DecisionRulesModule,
+        DecisionRulesEditorModule
+      ],
+      debounceInput: false
+    }));
+
+
+    it('should show <-> input placeholder', inject(function() {
+
+      // when
+      const editor = queryEditor('[data-element-id="unaryTest_1"]', testContainer);
+
+      // then
+      expect(editor.textContent).to.eql('-');
+    }));
+
+
+    it('should NOT show <-> output placeholder', inject(function() {
+
+      // when
+      const editor = queryEditor('[data-element-id="outputEntry_1"]', testContainer);
+
+      // then
+      expect(editor.textContent).to.eql('');
+    }));
 
   });
 

@@ -1,7 +1,7 @@
 {
   "name": "dmn-js-decision-table",
   "description": "A decision table view for dmn-js",
-  "version": "5.1.2",
+  "version": "8.0.0",
   "scripts": {
     "test": "karma start",
     "build": "del-cli lib && babel -s -q -d lib src",
@@ -11,7 +11,8 @@
   "main": "./lib/index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bpmn-io/dmn-js"
+    "url": "https://github.com/bpmn-io/dmn-js",
+    "directory": "packages/dmn-js-decision-table"
   },
   "license": "SEE LICENSE IN LICENSE",
   "keywords": [
@@ -22,22 +23,17 @@
   ],
   "devDependencies": {
     "dmn-font": "^0.4.1",
-    "inferno-test-utils": "^5.0.5"
+    "inferno-test-utils": "~5.0.5"
   },
   "dependencies": {
     "css.escape": "^1.5.1",
-    "diagram-js": "^2.4.0",
-    "dmn-js-shared": "^5.1.2",
+    "diagram-js": "^6.3.0",
+    "dmn-js-shared": "^8.0.0",
     "escape-html": "^1.0.3",
-    "inferno": "^5.0.5",
+    "inferno": "~5.0.5",
     "min-dash": "^3.0.0",
-    "min-dom": "^3.0.0",
-    "selection-ranges": "^3.0.0",
-    "table-js": "^5.0.3"
-  },
-  "babel": {
-    "presets": [
-      "env"
-    ]
+    "min-dom": "^3.1.1",
+    "selection-ranges": "^3.0.2",
+    "table-js": "^6.0.3"
   }
 }

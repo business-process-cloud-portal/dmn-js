@@ -3,20 +3,8 @@ import {
   inject
 } from 'test/TestHelper';
 
-import {
-  getMid
-} from 'diagram-js/lib/layout/LayoutUtil';
-
 import modelingModule from 'src/features/modeling';
 import coreModule from 'src/core';
-
-
-function expectWaypoint(waypoint, element) {
-  var midPoint = getMid(element);
-
-  expect(waypoint.x).to.eql(midPoint.x);
-  expect(waypoint.y).to.eql(midPoint.y);
-}
 
 
 describe('features/modeling - create connection', function() {
@@ -36,10 +24,10 @@ describe('features/modeling - create connection', function() {
         input = inputShape.businessObject,
         decisionShape = elementRegistry.get('decision_1'),
         decision = decisionShape.businessObject,
-        decisionExtensionElements = decision.extensionElements.values,
         informationRequirementConnection,
         informationRequirement,
         waypoints,
+        diWaypoints,
         requiredInput;
 
 
@@ -48,7 +36,8 @@ describe('features/modeling - create connection', function() {
 
     informationRequirement = informationRequirementConnection.businessObject;
 
-    waypoints = decisionExtensionElements[1].waypoints;
+    waypoints = informationRequirementConnection.waypoints;
+    diWaypoints = informationRequirement.di.waypoint;
 
     requiredInput = informationRequirement.requiredInput;
 
@@ -67,15 +56,19 @@ describe('features/modeling - create connection', function() {
     expect(decision.informationRequirement).to.include(informationRequirement);
     expect(rootElement.children).to.include(informationRequirementConnection);
 
-    expect(waypoints[0].x).to.eql(decisionExtensionElements[1].waypoints[0].x);
-    expect(waypoints[0].y).to.eql(decisionExtensionElements[1].waypoints[0].y);
+    // di
+    expect(informationRequirement.di.$parent).to.eql(rootElement.businessObject.di);
 
-    expect(waypoints[1].x).to.eql(decisionExtensionElements[1].waypoints[1].x);
-    expect(waypoints[1].y).to.eql(decisionExtensionElements[1].waypoints[1].y);
+    expect(waypoints[0].x).to.eql(diWaypoints[0].x);
+    expect(waypoints[0].y).to.eql(diWaypoints[0].y);
+
+    expect(waypoints[1].x).to.eql(diWaypoints[1].x);
+    expect(waypoints[1].y).to.eql(diWaypoints[1].y);
   }));
 
 
   it('should undo', inject(function(canvas, elementRegistry, commandStack, modeling) {
+
     // given
     var rootElement = canvas.getRootElement(),
         inputShape = elementRegistry.get('inputData_1'),
@@ -100,7 +93,7 @@ describe('features/modeling - create connection', function() {
     expect(rootElement.children).to.not.include(informationRequirementConnection);
 
     // di
-    expect(decision.extensionElements.values.length).to.eql(1);
+    expect(informationRequirement.di.$parent).to.be.null;
   }));
 
 
@@ -131,7 +124,7 @@ describe('features/modeling - create connection', function() {
     expect(rootElement.children).to.include(informationRequirementConnection);
 
     // di
-    expect(decision.extensionElements.values.length).to.eql(2);
+    expect(informationRequirement.di.$parent).to.eql(rootElement.businessObject.di);
   }));
 
 
@@ -157,6 +150,7 @@ describe('features/modeling - create connection', function() {
 
   it('should not contain source and target business object in waypoint data', inject(
     function(canvas, elementRegistry, commandStack, modeling) {
+
       // given
       var rootElement = canvas.getRootElement(),
           inputShape = elementRegistry.get('inputData_1'),
@@ -164,11 +158,11 @@ describe('features/modeling - create connection', function() {
           waypoints;
 
       // when
-      modeling.createConnection(inputShape, decisionShape, {
+      var connection = modeling.createConnection(inputShape, decisionShape, {
         type: 'dmn:InformationRequirement'
       }, rootElement);
 
-      waypoints = decisionShape.businessObject.extensionElements.values[1].waypoints;
+      waypoints = connection.businessObject.di.waypoint;
 
       // then
       expect(waypoints[0].$attrs.type).to.be.undefined;
@@ -181,12 +175,11 @@ describe('features/modeling - create connection', function() {
 
     it('should create an association', inject(
       function(canvas, elementRegistry, modeling) {
+
         // given
         var rootElement = canvas.getRootElement(),
             source = elementRegistry.get('inputData_1'),
             target = elementRegistry.get('annotation_1'),
-            sourceBounds = source.businessObject.extensionElements.values[0],
-            targetBounds = target.businessObject.extensionElements.values[0],
             connection,
             connectionBO,
             sourceRef,
@@ -201,7 +194,7 @@ describe('features/modeling - create connection', function() {
         sourceRef = connectionBO.sourceRef;
         targetRef = connectionBO.targetRef;
 
-        waypoints = connectionBO.extensionElements.values[0].waypoints;
+        waypoints = connectionBO.di.waypoint;
 
         // then
         expect(connection).to.exist;
@@ -218,15 +211,18 @@ describe('features/modeling - create connection', function() {
         expect(connectionBO.$parent).to.eql(rootElement.businessObject);
 
         expect(rootElement.children).to.include(connection);
-        expect(rootElement.businessObject.artifacts).to.include(connectionBO);
+        expect(rootElement.businessObject.get('artifact')).to.include(connectionBO);
 
-        expectWaypoint(waypoints[0], sourceBounds);
-        expectWaypoint(waypoints[1], targetBounds);
+        expect(waypoints[0].x).to.eql(connection.waypoints[0].x);
+        expect(waypoints[0].y).to.eql(connection.waypoints[0].y);
+        expect(waypoints[1].x).to.eql(connection.waypoints[1].x);
+        expect(waypoints[1].y).to.eql(connection.waypoints[1].y);
       }
     ));
 
 
     it('should undo', inject(function(canvas, elementRegistry, commandStack, modeling) {
+
       // given
       var rootElement = canvas.getRootElement(),
           source = elementRegistry.get('inputData_1'),
@@ -242,11 +238,12 @@ describe('features/modeling - create connection', function() {
       expect(connectionBO.$parent).to.be.null;
 
       expect(rootElement.children).to.not.include(connection);
-      expect(rootElement.businessObject.artifacts).to.not.include(connectionBO);
+      expect(rootElement.businessObject.get('artifact')).to.not.include(connectionBO);
     }));
 
 
     it('should redo', inject(function(canvas, elementRegistry, commandStack, modeling) {
+
       // given
       var rootElement = canvas.getRootElement(),
           rootElementBO = rootElement.businessObject,
@@ -264,32 +261,37 @@ describe('features/modeling - create connection', function() {
       expect(connectionBO.$parent).to.eql(rootElementBO);
 
       expect(rootElement.children).to.include(connection);
-      expect(rootElementBO.artifacts).to.include(connectionBO);
+      expect(rootElementBO.get('artifact')).to.include(connectionBO);
     }));
 
   });
 
   describe('append', function() {
 
-    it('should connect decision to knowledge source', inject(
-      function(canvas, elementRegistry, elementFactory, modeling) {
+    it('should connect input data to decision', inject(
+      function(canvas, elementFactory, elementRegistry, modeling) {
+
         // given
-        var decision = elementRegistry.get('decision_1'),
-            inputData = elementFactory.createShape({ type: 'dmn:InputData' }),
-            rootElement = canvas.getRootElement(),
-            connection;
+        var inputData = elementRegistry.get('inputData_1'),
+            decision = elementFactory.createShape({ type: 'dmn:Decision' }),
+            rootElement = canvas.getRootElement();
 
         // when
-        modeling.appendShape(decision, inputData, { x: 100, y: 300 }, rootElement);
-
-        connection = decision.incoming[0];
+        modeling.appendShape(inputData, decision, { x: 100, y: 100 }, rootElement);
 
         // then
-        expect(connection.type).to.eql('dmn:InformationRequirement');
-        expect(inputData.outgoing[0].type).to.eql('dmn:InformationRequirement');
-        expect(
-          decision.businessObject.extensionElements.values[1].source
-        ).to.equal(inputData.id);
+        expect(inputData.outgoing).to.have.lengthOf(1);
+        expect(decision.incoming).to.have.lengthOf(1);
+
+        var connection = inputData.outgoing[0];
+
+        expect(connection.type).to.equal('dmn:InformationRequirement');
+        expect(connection.source).to.equal(inputData);
+        expect(connection.target).to.equal(decision);
+
+        var edge = connection.businessObject.di;
+
+        expect(edge).to.exist;
       })
     );
 
@@ -300,6 +302,7 @@ describe('features/modeling - create connection', function() {
 
     it('should connect decision to knowledge source', inject(
       function(canvas, elementRegistry, commandStack, modeling) {
+
         // given
         var source = elementRegistry.get('decision_1'),
             target = elementRegistry.get('host_ks'),
@@ -316,6 +319,7 @@ describe('features/modeling - create connection', function() {
 
     it('should connect business knowledge model to decision', inject(
       function(elementRegistry, modeling) {
+
         // given
         var source = elementRegistry.get('elMenu'),
             target = elementRegistry.get('decision_1'),
@@ -332,6 +336,7 @@ describe('features/modeling - create connection', function() {
 
     it('should connect knowledge source to decision', inject(
       function(elementRegistry, modeling) {
+
         // given
         var source = elementRegistry.get('host_ks'),
             target = elementRegistry.get('decision_1'),
@@ -348,6 +353,7 @@ describe('features/modeling - create connection', function() {
 
     it('should connect knowledge source to business knowlege model', inject(
       function(elementRegistry, modeling) {
+
         // given
         var source = elementRegistry.get('host_ks'),
             target = elementRegistry.get('elMenu'),
@@ -364,6 +370,7 @@ describe('features/modeling - create connection', function() {
 
     it('should connect input data to decision', inject(
       function(elementRegistry, modeling) {
+
         // given
         var source = elementRegistry.get('inputData_1'),
             target = elementRegistry.get('decision_1'),
@@ -380,6 +387,7 @@ describe('features/modeling - create connection', function() {
 
     it('should connect input data to knowledge source', inject(
       function(elementRegistry, modeling) {
+
         // given
         var source = elementRegistry.get('inputData_1'),
             target = elementRegistry.get('host_ks'),
@@ -396,6 +404,7 @@ describe('features/modeling - create connection', function() {
 
     it('should connect input data to text annotation', inject(
       function(elementRegistry, modeling) {
+
         // given
         var source = elementRegistry.get('inputData_1'),
             target = elementRegistry.get('annotation_1'),

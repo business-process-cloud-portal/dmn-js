@@ -3,234 +3,124 @@ import {
   inject
 } from '../../../../TestHelper';
 
-import {
-  is
-} from 'dmn-js-shared/lib/util/ModelUtil';
-
-import {
-  find
-} from 'min-dash';
-
-import modelingModule from 'src/features/modeling';
 import coreModule from 'src/core';
+import modelingModule from 'src/features/modeling';
+import { is } from 'dmn-js-shared/lib/util/ModelUtil';
 
-
-function getConnection(source, target, connectionOrType) {
-  return find(source.outgoing, function(c) {
-    return c.target === target && (
-      typeof connectionOrType === 'string' ?
-        is(c, connectionOrType) :
-        c === connectionOrType
-    );
-  });
-}
-
-function expectConnected(source, target, connectionOrType) {
-  expect(getConnection(source, target, connectionOrType)).to.exist;
-}
-
-function expectNotConnected(source, target, connectionOrType) {
-  expect(getConnection(source, target, connectionOrType)).not.to.exist;
-}
+import { getMid } from 'diagram-js/lib/layout/LayoutUtil';
 
 
 describe('features/modeling - replace connection', function() {
 
-  var testModules = [ coreModule, modelingModule ];
+  var testModules = [
+    coreModule,
+    modelingModule
+  ];
 
-  var diagramXML = require('../../../../fixtures/dmn/reconnect.dmn');
+  var diagramXML = require('./replace-connection-behavior.dmn');
 
   beforeEach(bootstrapModeler(diagramXML, {
     modules: testModules
   }));
 
-  var element;
 
-  beforeEach(inject(function(elementRegistry) {
-    element = function(id) {
-      return elementRegistry.get(id);
-    };
-  }));
+  describe('reconnect start', function() {
 
+    it('should replace information requirement with authority requirement', inject(
+      function(elementRegistry, modeling) {
 
-  it('should update target', inject(function(modeling) {
+        // given
+        var decision1 = elementRegistry.get('Decision_1'),
+            decision2 = elementRegistry.get('Decision_2'),
+            connection = modeling.connect(decision1, decision2),
+            knowledgeSource = elementRegistry.get('KnowledgeSource_1');
 
-    // given
-    var source = element('host_ks'),
-        oldTarget = element('guestCount'),
-        newTarget = element('decision2'),
-        connection = getConnection(source, oldTarget, 'dmn:AuthorityRequirement'),
+        // when
+        modeling.reconnectStart(connection, knowledgeSource, getMid(knowledgeSource));
 
-        newTargetBounds = newTarget.businessObject.extensionElements.values[0],
+        // then
+        var newConnection = knowledgeSource.outgoing[ 0 ];
 
-        newWaypoints = [
-          connection.waypoints[0],
-          { x: newTargetBounds.x, y: newTargetBounds.y }
-        ];
-
-    // when
-    modeling.reconnectEnd(connection, newTarget, newWaypoints);
-
-    // then
-    expectNotConnected(source, oldTarget, 'dmn:AuthorityRequirement');
-    expectConnected(source, newTarget, 'dmn:AuthorityRequirement');
-  }));
+        expect(is(newConnection, 'dmn:AuthorityRequirement')).to.be.true;
+      }
+    ));
 
 
-  it('should update source', inject(function(modeling) {
+    it('should replace information requirement with knowledge requirement', inject(
+      function(elementRegistry, modeling) {
 
-    // given
-    var oldSource = element('host_ks'),
-        newSource = element('elMenu'),
-        target = element('guestCount'),
-        connection = getConnection(oldSource, target, 'dmn:AuthorityRequirement'),
+        // given
+        var decision1 = elementRegistry.get('Decision_1'),
+            decision2 = elementRegistry.get('Decision_2'),
+            connection = modeling.connect(decision1, decision2),
+            businessKnowledgeModel = elementRegistry.get('BusinessKnowledgeModel_1');
 
-        newSourceBounds = newSource.businessObject.extensionElements.values[0],
+        // when
+        modeling.reconnectStart(
+          connection,
+          businessKnowledgeModel,
+          getMid(businessKnowledgeModel)
+        );
 
-        newWaypoints = [
-          { x: newSourceBounds.x, y: newSourceBounds.y },
-          connection.waypoints[1]
-        ];
+        // then
+        var newConnection = businessKnowledgeModel.outgoing[ 0 ];
 
-
-    // when
-    modeling.reconnectStart(connection, newSource, newWaypoints);
-
-    // then
-    expectNotConnected(oldSource, target, 'dmn:AuthorityRequirement');
-    expectConnected(newSource, target, 'dmn:KnowledgeRequirement');
-  }));
-
-
-  it('should replace Association with InformationRequirement', inject(
-    function(modeling) {
-
-      // given
-      var source = element('dayType_id'),
-          oldTarget = element('annotation_1'),
-          newTarget = element('guestCount'),
-          connection = element('Association_1'),
-
-          newTargetBounds = newTarget.businessObject.extensionElements.values[0],
-
-          newWaypoints = [
-            connection.waypoints[0],
-            { x: newTargetBounds.x, y: newTargetBounds.y }
-          ];
-
-      // when
-      modeling.reconnectEnd(connection, newTarget, newWaypoints);
-
-      // then
-      expectNotConnected(source, oldTarget, 'dmn:Association');
-      expectConnected(source, newTarget, 'dmn:InformationRequirement');
-    }
-  ));
+        expect(is(newConnection, 'dmn:KnowledgeRequirement')).to.be.true;
+      }
+    ));
 
 
-  it('should replace AuthorityRequirement with Association', inject(
-    function(modeling) {
+    it('should NOT replace information requirement', inject(
+      function(elementRegistry, modeling) {
 
-      // given
-      var source = element('host_ks'),
-          oldTarget = element('guestCount'),
-          newTarget = element('annotation_1'),
-          connection = getConnection(source, oldTarget, 'dmn:AuthorityRequirement'),
+        // given
+        var decision1 = elementRegistry.get('Decision_1'),
+            decision2 = elementRegistry.get('Decision_2'),
+            connection = modeling.connect(decision1, decision2),
+            inputData = elementRegistry.get('InputData_1');
 
-          newTargetBounds = newTarget.businessObject.extensionElements.values[0],
+        // when
+        modeling.reconnectStart(
+          connection,
+          inputData,
+          getMid(inputData)
+        );
 
-          newWaypoints = [
-            connection.waypoints[0],
-            { x: newTargetBounds.x, y: newTargetBounds.y }
-          ];
+        // then
+        var newConnection = inputData.outgoing[ 0 ];
 
-      // when
-      modeling.reconnectEnd(connection, newTarget, newWaypoints);
+        expect(is(newConnection, 'dmn:InformationRequirement')).to.be.true;
+      }
+    ));
 
-      // then
-      expectNotConnected(source, oldTarget, 'dmn:AuthorityRequirement');
-      expectConnected(source, newTarget, 'dmn:Association');
-    }
-  ));
-
-
-  it('should undo', inject(function(modeling, commandStack) {
-
-    // given
-    var source = element('host_ks'),
-        oldTarget = element('guestCount'),
-        newTarget = element('decision2'),
-        connection = getConnection(source, oldTarget, 'dmn:AuthorityRequirement'),
-
-        newTargetBounds = newTarget.businessObject.extensionElements.values[0],
-
-        newWaypoints = [
-          connection.waypoints[0],
-          { x: newTargetBounds.x, y: newTargetBounds.y }
-        ];
-
-    modeling.reconnectEnd(connection, newTarget, newWaypoints);
-
-    // when
-    commandStack.undo();
-
-    // then
-    expectNotConnected(source, newTarget, 'dmn:AuthorityRequirement');
-    expectConnected(source, oldTarget, 'dmn:AuthorityRequirement');
-  }));
+  });
 
 
-  it('should redo', inject(function(modeling, commandStack) {
+  describe('reconnect end', function() {
 
-    // given
-    var source = element('host_ks'),
-        oldTarget = element('guestCount'),
-        newTarget = element('decision2'),
-        connection = getConnection(source, oldTarget, 'dmn:AuthorityRequirement'),
+    it('should replace information requirement with association', inject(
+      function(elementRegistry, modeling) {
 
-        newTargetBounds = newTarget.businessObject.extensionElements.values[0],
+        // given
+        var decision1 = elementRegistry.get('Decision_1'),
+            decision2 = elementRegistry.get('Decision_2'),
+            connection = modeling.connect(decision1, decision2),
+            textAnnotation = elementRegistry.get('TextAnnotation_1');
 
-        newWaypoints = [
-          connection.waypoints[0],
-          { x: newTargetBounds.x, y: newTargetBounds.y }
-        ];
+        // when
+        modeling.reconnectEnd(
+          connection,
+          textAnnotation,
+          getMid(textAnnotation)
+        );
 
-    modeling.reconnectEnd(connection, newTarget, newWaypoints);
+        // then
+        var newConnection = textAnnotation.incoming[ 0 ];
 
-    // when
-    commandStack.undo();
-    commandStack.redo();
+        expect(is(newConnection, 'dmn:Association')).to.be.true;
+      }
+    ));
 
-    // then
-    expectNotConnected(source, oldTarget, 'dmn:AuthorityRequirement');
-    expectConnected(source, newTarget, 'dmn:AuthorityRequirement');
-  }));
-
-
-  it('should update the semantic parent on undo', inject(
-    function(modeling, commandStack) {
-
-      // given
-      var source = element('host_ks'),
-          oldTarget = element('guestCount'),
-          newTarget = element('decision2'),
-          connection = getConnection(source, oldTarget, 'dmn:AuthorityRequirement'),
-
-          newTargetBounds = newTarget.businessObject.extensionElements.values[0],
-
-          newWaypoints = [
-            connection.waypoints[0],
-            { x: newTargetBounds.x, y: newTargetBounds.y }
-          ];
-
-      modeling.reconnectEnd(connection, newTarget, newWaypoints);
-
-      // when
-      commandStack.undo();
-
-      // then
-      expect(oldTarget.businessObject.authorityRequirement).to.have.a.lengthOf(1);
-    }
-  ));
+  });
 
 });

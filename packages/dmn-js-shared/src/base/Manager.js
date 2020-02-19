@@ -2,6 +2,8 @@ import EventBus from 'diagram-js/lib/core/EventBus';
 
 import DmnModdle from 'dmn-moddle';
 
+import CamundaModdle from 'camunda-dmn-moddle/resources/camunda';
+
 import {
   domify,
   query as domQuery,
@@ -47,7 +49,7 @@ export default class Manager {
   }
 
   /**
-   * Parse and render a DMN 1.1 diagram.
+   * Parse and render a DMN diagram.
    *
    * Once finished the viewer reports back the result to the
    * provided callback function with (err, warnings).
@@ -64,7 +66,7 @@ export default class Manager {
    *
    * You can use these events to hook into the life-cycle.
    *
-   * @param {String} xml the DMN 1.1 xml
+   * @param {String} xml the DMN xml
    * @param {Object} [options]
    * @param {Boolean} [options.open=true]
    * @param {Function} [done] invoked with (err, warnings=[])
@@ -99,7 +101,7 @@ export default class Manager {
       this._setDefinitions(definitions);
 
       if (err) {
-        err = checkValidationError(err);
+        err = checkDMNCompatibilityError(err, xml) || checkValidationError(err) || err;
       }
 
       if (err || !options.open) {
@@ -160,8 +162,8 @@ export default class Manager {
   }
 
   /**
-   * Export the currently displayed DMN 1.1 diagram as
-   * a DMN 1.1 XML document.
+   * Export the currently displayed DMN diagram as
+   * a DMN XML document.
    *
    * ## Life-Cycle Events
    *
@@ -264,14 +266,18 @@ export default class Manager {
     }
 
     parentNode.appendChild(this._container);
+
+    this._emit('attach', {});
   }
 
   detach() {
+    this._emit('detach', {});
+
     domRemove(this._container);
   }
 
   destroy() {
-    Object.keys(this._viewers, (viewerId) => {
+    Object.keys(this._viewers).forEach((viewerId) => {
       var viewer = this._viewers[viewerId];
 
       safeExecute(viewer, 'destroy');
@@ -345,7 +351,7 @@ export default class Manager {
 
     var viewProviders = this._getViewProviders();
 
-    var displayableElements = [ definitions, ...(definitions.drgElements || []) ];
+    var displayableElements = [ definitions, ...(definitions.drgElement || []) ];
 
     // compute list of available views
     this._views = displayableElements.reduce((views, element) => {
@@ -377,15 +383,18 @@ export default class Manager {
         newActiveView;
 
     if (activeView) {
+
       // check the new active view
       newActiveView = find(this._views, function(v) {
         return viewsEqual(activeView, v);
       }) || this._getInitialView(this._views);
 
       if (viewsEqual(activeView, newActiveView)) {
+
         // active view changed
         this._activeView = newActiveView;
       } else {
+
         // active view got deleted
         return this._switchView(null);
       }
@@ -510,7 +519,9 @@ export default class Manager {
   }
 
   _createModdle(options) {
-    return new DmnModdle(options.moddleExtensions || {});
+    return new DmnModdle(assign({
+      camunda: CamundaModdle
+    }, options.moddleExtensions));
   }
 
   /**
@@ -538,19 +549,53 @@ function ensureUnit(val) {
   return val + (isNumber(val) ? 'px' : '');
 }
 
+function checkDMNCompatibilityError(err, xml) {
+
+  // check if we can indicate opening of old DMN 1.1 or DMN 1.2 diagrams
+
+  if (err.message !== 'failed to parse document as <dmn:Definitions>') {
+    return null;
+  }
+
+  var olderDMNVersion = (
+    (xml.indexOf('"http://www.omg.org/spec/DMN/20151101/dmn.xsd"') !== -1 && '1.1') ||
+    (xml.indexOf('"http://www.omg.org/spec/DMN/20180521/MODEL/"') !== -1 && '1.2')
+  );
+
+  if (!olderDMNVersion) {
+    return null;
+  }
+
+  err = new Error(
+    'unsupported DMN ' + olderDMNVersion + ' file detected; ' +
+    'only DMN 1.3 files can be opened'
+  );
+
+  console.error(
+    'Cannot open what looks like a DMN ' + olderDMNVersion + ' diagram. ' +
+    'Please refer to https://bpmn.io/l/dmn-compatibility.html ' +
+    'to learn how to make the toolkit compatible with older DMN files',
+    err
+  );
+
+  return err;
+}
+
 function checkValidationError(err) {
 
-  // check if we can help the user by indicating wrong DMN 1.1 xml
+  // check if we can help the user by indicating wrong DMN 1.3 xml
   // (in case he or the exporting tool did not get that right)
 
   var pattern = /unparsable content <([^>]+)> detected([\s\S]*)$/,
       match = pattern.exec(err.message);
 
-  if (match) {
-    err.message =
-      'unparsable content <' + match[1] + '> detected; ' +
-      'this may indicate an invalid DMN 1.1 diagram file' + match[2];
+  if (!match) {
+    return null;
   }
+
+  err.message =
+    'unparsable content <' + match[1] + '> detected; ' +
+    'this may indicate an invalid DMN 1.3 diagram file' + match[2];
 
   return err;
 }

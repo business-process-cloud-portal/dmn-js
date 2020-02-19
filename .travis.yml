@@ -1,7 +1,5 @@
 language: node_js
-
-node_js:
-  - 'node'
+node_js: '10'
 
 jobs:
   include:
@@ -9,11 +7,20 @@ jobs:
       addons:
         firefox: 'latest-esr'
       script:
-        - TEST_BROWSERS=Firefox,ChromeHeadless xvfb-run npm run travis
+        - COVERAGE=1 TEST_BROWSERS=Firefox,ChromeHeadless xvfb-run npm run travis
+        - npx codecov
     - stage: update examples
       script: './tasks/stages/update-examples'
+    - stage: update demo
+      script: './tasks/stages/update-demo'
+    - stage: update website
+      script: './tasks/stages/update-website'
 
 stages:
   - test
   - name: update examples
-    if: tag =~ ^v\d
+    if: tag =~ ^v\d+\.\d+\.\d+$
+  - name: update demo
+    if: tag =~ ^v\d+\.\d+\.\d+$
+  - name: update website
+    if: tag =~ ^v\d+\.\d+\.\d+$

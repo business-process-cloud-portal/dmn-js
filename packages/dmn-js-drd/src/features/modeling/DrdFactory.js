@@ -1,6 +1,9 @@
 import {
-  forEach
+  assign,
+  pick
 } from 'min-dash';
+
+import { isAny } from 'dmn-js-shared/lib/util/ModelUtil';
 
 
 export default function DrdFactory(moddle) {
@@ -11,15 +14,16 @@ DrdFactory.$inject = [ 'moddle' ];
 
 
 DrdFactory.prototype._needsId = function(element) {
-  return element.$instanceOf('dmn:DRGElement') ||
-         element.$instanceOf('dmn:Artifact') ||
-         element.$instanceOf('dmn:DMNElement');
+  return isAny(element, [
+    'dmn:Artifact',
+    'dmn:DMNElement',
+    'dmn:DRGElement',
+    'dmndi:DMNDiagram',
+    'dmndi:DMNDiagramElement'
+  ]);
 };
 
 DrdFactory.prototype._ensureId = function(element) {
-
-  // generate semantic ids for elements
-  // dmn:Decision -> Decision_ID
   var prefix = (element.$type || '').replace(/^[^:]*:/g, '') + '_';
 
   if (!element.id && this._needsId(element)) {
@@ -35,28 +39,37 @@ DrdFactory.prototype.create = function(type, attrs) {
   return element;
 };
 
-DrdFactory.prototype.createDi = function() {
-  return this.create('dmn:ExtensionElements', { values: [] });
+DrdFactory.prototype.createDiShape = function(semantic, bounds, attrs) {
+
+  return this.create('dmndi:DMNShape', assign({
+    dmnElementRef: semantic,
+    bounds: this.createDiBounds(bounds)
+  }, attrs));
 };
 
 DrdFactory.prototype.createDiBounds = function(bounds) {
-  return this.create('biodi:Bounds', bounds);
+  return this.create('dc:Bounds', bounds);
 };
 
-DrdFactory.prototype.createDiEdge = function(source, waypoints) {
+DrdFactory.prototype.createDiEdge = function(semantic, waypoints, attrs) {
+  return this.create('dmndi:DMNEdge', {
+    dmnElementRef: semantic,
+    waypoint: this.createDiWaypoints(waypoints)
+  }, attrs);
+};
+
+DrdFactory.prototype.createDiWaypoints = function(waypoints) {
   var self = this;
-  var semanticWaypoints = [];
 
-  forEach(waypoints || [], function(wp) {
-    semanticWaypoints.push(self.createDiWaypoint(wp));
-  });
-
-  return this.create('biodi:Edge', {
-    waypoints: semanticWaypoints,
-    source: source.id
+  return waypoints.map(function(waypoint) {
+    return self.createDiWaypoint(waypoint);
   });
 };
 
 DrdFactory.prototype.createDiWaypoint = function(waypoint) {
-  return this.create('biodi:Waypoint', waypoint);
+  return this.create('dc:Point', pick(waypoint, [ 'x', 'y' ]));
+};
+
+DrdFactory.prototype.createExtensionElements = function() {
+  return this.create('dmn:ExtensionElements', { values: [] });
 };

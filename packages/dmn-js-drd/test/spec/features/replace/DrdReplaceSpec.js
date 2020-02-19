@@ -170,6 +170,7 @@ describe('features/replace - drd replace', function() {
 
     it('should keep references for associations', inject(
       function(elementRegistry, drdReplace) {
+
         // given
         var decision = elementRegistry.get('decision');
 
@@ -190,12 +191,12 @@ describe('features/replace - drd replace', function() {
         var associationBo = association.businessObject;
 
         expect(associationBo.sourceRef.href).to.eql('#decision');
-        expect(associationBo.extensionElements.values[0].source).to.eql('decision');
       }
     ));
 
 
     it('should undo', inject(function(elementRegistry, drdReplace, commandStack) {
+
       // given
       var decision = elementRegistry.get('decision');
 
@@ -217,11 +218,11 @@ describe('features/replace - drd replace', function() {
       var associationBo = association.businessObject;
 
       expect(associationBo.sourceRef.href).to.eql('#decision');
-      expect(associationBo.extensionElements.values[0].source).to.eql('decision');
     }));
 
 
     it('should redo', inject(function(elementRegistry, drdReplace, commandStack) {
+
       // given
       var decision = elementRegistry.get('decision');
 
@@ -244,7 +245,6 @@ describe('features/replace - drd replace', function() {
       var associationBo = association.businessObject;
 
       expect(associationBo.sourceRef.href).to.eql('#decision');
-      expect(associationBo.extensionElements.values[0].source).to.eql('decision');
     }));
 
   });

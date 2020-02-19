@@ -1,7 +1,7 @@
 {
   "name": "dmn-js-shared",
   "description": "Shared components used by dmn-js",
-  "version": "5.1.2",
+  "version": "8.0.0",
   "scripts": {
     "test": "karma start",
     "build": "del-cli lib && babel -s -q -d lib src",
@@ -9,25 +9,26 @@
     "prepublishOnly": "npm run build"
   },
   "main": "./lib/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bpmn-io/dmn-js",
+    "directory": "packages/dmn-js-shared"
+  },
   "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
     "didi": "^4.0.0",
-    "inferno-test-utils": "^5.0.5"
+    "inferno-test-utils": "~5.0.5"
   },
   "dependencies": {
-    "diagram-js": "^2.4.0",
-    "dmn-moddle": "^5.0.0",
+    "camunda-dmn-moddle": "^1.0.0",
+    "diagram-js": "^6.3.0",
+    "dmn-moddle": "^8.0.0",
     "ids": "^0.2.0",
-    "inferno": "^5.0.5",
+    "inferno": "~5.0.5",
     "min-dash": "^3.0.0",
-    "min-dom": "^3.0.0",
-    "selection-ranges": "^3.0.0",
+    "min-dom": "^3.1.1",
+    "selection-ranges": "^3.0.2",
     "selection-update": "^0.1.2",
-    "table-js": "^5.0.3"
-  },
-  "babel": {
-    "presets": [
-      "env"
-    ]
+    "table-js": "^6.0.3"
   }
 }

@@ -1,4 +1,4 @@
-import uglify from 'rollup-plugin-uglify';
+import { uglify } from 'rollup-plugin-uglify';
 import nodeResolve from 'rollup-plugin-node-resolve';
 import commonjs from 'rollup-plugin-commonjs';
 import json from 'rollup-plugin-json';
@@ -96,18 +96,20 @@ function pgl(plugins=[]) {
     }),
     json(),
     nodeResolve({
-      module: true,
-      main: true,
-      browser: true
+      mainFields: [
+        'browser',
+        'module',
+        'main'
+      ]
     }),
+    commonjs(),
     babel({
       babelrc: false,
       exclude: 'node_modules/**',
       presets: [
-        [ 'env', { modules: false } ]
+        [ '@babel/preset-env', { modules: false } ]
       ]
     }),
-    commonjs(),
     ...plugins
   ];
 }
@@ -126,7 +128,7 @@ function today() {
   return [
     d.getFullYear(),
     pad(d.getMonth() + 1),
-    pad(d.getDay())
+    pad(d.getDate())
   ].join('-');
 }
 

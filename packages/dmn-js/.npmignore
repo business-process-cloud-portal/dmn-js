@@ -4,7 +4,9 @@ tasks
 test/*
 !dist
 !lib
+!core
 !test/helper/*
 .babelrc
 karma.conf.js
 rollup.config.js
+coverage

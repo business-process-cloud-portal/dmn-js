@@ -15,6 +15,8 @@ export default class InputCell extends Component {
     super(props, context);
 
     mixin(this, ComponentWithSlots);
+
+    this._translate = context.injector.get('translate');
   }
 
   onClick = (event) => {
@@ -37,6 +39,13 @@ export default class InputCell extends Component {
 
   onElementsChanged = () => {
     this.forceUpdate();
+  }
+
+  isDefaultExpressionLanguage(expressionLanguage) {
+    const expressionLanguages = this.context.injector.get('expressionLanguages');
+    const defaultExpressionLanguage = expressionLanguages.getDefault('inputCell').value;
+
+    return expressionLanguage === defaultExpressionLanguage;
   }
 
   componentWillMount() {
@@ -74,9 +83,11 @@ export default class InputCell extends Component {
     var label = input.get('label');
     var inputVariable = input.get('inputVariable');
 
-    var expressionLanguage = inputExpression.get('expressionLanguage') || 'FEEL';
+    var expressionLanguage = inputExpression.get('expressionLanguage');
 
-    var showLanguageBadge = !label && expressionLanguage != 'FEEL';
+    var showLanguageBadge = !label &&
+      expressionLanguage &&
+      this.isDefaultExpressionLanguage(expressionLanguage);
 
     return (
       <th
@@ -98,11 +109,13 @@ export default class InputCell extends Component {
 
         {
           label ? (
-            <span className="input-label" title="Input Label">
+            <span className="input-label" title={ this._translate('Input Label') }>
               { label }
             </span>
           ) : (
-            <span className="input-expression" title="Input Expression">
+            <span
+              className="input-expression"
+              title={ this._translate('Input Expression') }>
               { inputExpression.text || '-' }
             </span>
           )
@@ -122,8 +135,11 @@ export default class InputCell extends Component {
           showLanguageBadge && (
             <span
               className="dms-badge dmn-expression-language input-expression-language"
-              title={ 'Input Expression Language = ' + expressionLanguage }>
-
+              title={ this._translate(
+                'Input Expression Language = {expressionLanguage}',
+                { expressionLanguage }
+              ) }
+            >
               <span className="dms-badge-icon dmn-icon-file-code"></span>
               <span className="dms-badge-label">{ expressionLanguage }</span>
             </span>

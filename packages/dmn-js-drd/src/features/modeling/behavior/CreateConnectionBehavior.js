@@ -2,85 +2,71 @@ import inherits from 'inherits';
 
 import CommandInterceptor from 'diagram-js/lib/command/CommandInterceptor';
 
-import {
-  getMid
-} from 'diagram-js/lib/layout/LayoutUtil';
-
-import {
-  is
-} from 'dmn-js-shared/lib/util/ModelUtil';
-
-function getRequirementType(source) {
-  switch (source.type) {
-  case 'dmn:InputData':
-    return 'Input';
-  case 'dmn:Decision':
-    return 'Decision';
-  case 'dmn:KnowledgeSource':
-    return 'Authority';
-  case 'dmn:BusinessKnowledgeModel':
-    return 'Knowledge';
-  }
-}
+import { is } from 'dmn-js-shared/lib/util/ModelUtil';
 
 
-export default function CreateConnectionBehavior(eventBus, drdFactory, drdRules) {
-
-  CommandInterceptor.call(this, eventBus);
+/**
+ * Creates DMN-specific refs for new connection.
+ *
+ * @param {DrdFactory} drdFactory
+ * @param {Injector} injector
+ */
+export default function CreateConnectionBehavior(drdFactory, injector) {
+  injector.invoke(CommandInterceptor, this);
 
   this.preExecute('connection.create', function(context) {
     var connection = context.connection,
-        connectionBusinessObject = connection.businessObject,
+        connectionBo = connection.businessObject,
         source = context.source,
         target = context.target,
-        sourceRef, targetRef,
-        requirementType, requirement, edge;
+        elementRef,
+        sourceRef,
+        targetRef;
 
-    if (connection.type === 'dmn:Association') {
-      sourceRef = drdFactory.create('dmn:DMNElementReference', {
-        href: '#' + source.id
-      });
-      targetRef = drdFactory.create('dmn:DMNElementReference', {
-        href: '#' + target.id
-      });
+    if (is(connection, 'dmn:Association')) {
+      sourceRef = connectionBo.sourceRef = drdFactory
+        .create('dmn:DMNElementReference', {
+          href: '#' + source.id
+        });
 
-      connectionBusinessObject.sourceRef = sourceRef;
-      connectionBusinessObject.targetRef = targetRef;
+      sourceRef.$parent = connectionBo;
 
-      connectionBusinessObject.extensionElements = drdFactory.createDi();
+      targetRef = connectionBo.targetRef = drdFactory
+        .create('dmn:DMNElementReference', {
+          href: '#' + target.id
+        });
 
-      edge = drdFactory.createDiEdge(source, [ getMid(source), getMid(target)]);
-
-      connectionBusinessObject.extensionElements.values.push(edge);
-
+      targetRef.$parent = connectionBo;
     } else {
+      elementRef = connectionBo[ 'required' + getRequirementType(source) ] = drdFactory
+        .create('dmn:DMNElementReference', {
+          href: '#' + source.id
+        });
 
-      // flip around source and target
-      if (is(source, 'dmn:Decision') && is(target, 'dmn:InputData')) {
-        context.target = source;
-        context.source = source = target;
-      }
-
-      requirementType = getRequirementType(source);
-      requirement = drdFactory.create('dmn:DMNElementReference', {
-        href: '#' + source.id
-      });
-
-      connectionBusinessObject['required' + requirementType] = requirement;
-
-      edge = drdFactory.createDiEdge(source, [ getMid(source), getMid(context.target)]);
-
-      // DI
-      context.di = edge;
+      elementRef.$parent = connectionBo;
     }
   }, true);
+
 }
 
-
 CreateConnectionBehavior.$inject = [
-  'eventBus',
   'drdFactory',
-  'drdRules'
+  'injector'
 ];
 
 inherits(CreateConnectionBehavior, CommandInterceptor);
+
+
+// helpers //////////
+
+function getRequirementType(source) {
+  if (is(source, 'dmn:BusinessKnowledgeModel')) {
+    return 'Knowledge';
+  } else if (is(source, 'dmn:Decision')) {
+    return 'Decision';
+  } else if (is(source, 'dmn:InputData')) {
+    return 'Input';
+  } else if (is(source, 'dmn:KnowledgeSource')) {
+    return 'Authority';
+  }
+}

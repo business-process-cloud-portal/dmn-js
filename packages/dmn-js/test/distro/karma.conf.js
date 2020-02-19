@@ -1,5 +1,3 @@
-/* global process */
-
 // configures browsers to run test against
 // any of [ 'ChromeHeadless', 'Chrome', 'Firefox', 'IE' ]
 var browsers =
@@ -14,9 +12,9 @@ var browsers =
         if (process.platform === 'linux') {
           return 'ChromeHeadless_Linux';
         }
-      } else {
-        return browser;
       }
+
+      return browser;
     });
 
 
@@ -51,7 +49,7 @@ module.exports = function(karma) {
       'test/distro/' + VARIANT + '.js'
     ],
 
-    reporters: [ 'spec' ],
+    reporters: [ 'progress' ],
 
     customLaunchers: {
       ChromeHeadless_Linux: {

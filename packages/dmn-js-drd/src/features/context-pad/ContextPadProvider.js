@@ -14,7 +14,7 @@ import {
 
 
 /**
-* A provider for DMN 1.1 elements context pad
+* A provider for DMN elements context pad
 */
 export default function ContextPadProvider(
     eventBus, contextPad, modeling,
@@ -136,7 +136,10 @@ ContextPadProvider.prototype.getContextPadEntries = function(element) {
     function appendListener(event, element) {
 
       var shape = elementFactory.createShape(assign({ type: type }, options));
-      create.start(event, shape, element);
+
+      create.start(event, shape, {
+        source: element
+      });
     }
 
     return {
@@ -243,6 +246,7 @@ ContextPadProvider.prototype.getContextPadEntries = function(element) {
   var deleteAllowed = rules.allowed('elements.delete', { elements: [ element ] });
 
   if (isArray(deleteAllowed)) {
+
     // was the element returned as a deletion candidate?
     deleteAllowed = deleteAllowed[0] === element;
   }

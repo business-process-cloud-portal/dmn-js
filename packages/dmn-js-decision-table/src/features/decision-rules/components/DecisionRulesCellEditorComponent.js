@@ -8,15 +8,6 @@ import EditableComponent from 'dmn-js-shared/lib/components/EditableComponent';
 
 import { Cell } from 'table-js/lib/components';
 
-const EXPRESSION_LANGUAGE_LABELS = {
-  feel: 'FEEL',
-  juel: 'JUEL',
-  python: 'Python',
-  javascript: 'JavaScript',
-  groovy: 'Groovy',
-  jruby: 'JRuby'
-};
-
 
 export default class DecisionRulesEditorCellComponent extends Component {
 
@@ -91,13 +82,12 @@ export default class DecisionRulesEditorCellComponent extends Component {
 
     const { isFocussed } = this.state;
 
-    const className = is(cell, 'dmn:UnaryTests') ? 'input-cell' : 'output-cell';
-
+    const isUnaryTest = is(cell, 'dmn:UnaryTests');
     const businessObject = cell.businessObject;
 
     return (
       <Cell
-        className={ className }
+        className={ isUnaryTest ? 'input-cell' : 'output-cell' }
         elementId={ cell.id }
         coords={ `${rowIndex}:${colIndex}` }
         data-row-id={ row.id }
@@ -105,6 +95,7 @@ export default class DecisionRulesEditorCellComponent extends Component {
       >
         <TableCellEditor
           className="cell-editor"
+          placeholder={ isUnaryTest ? '-' : '' }
           ctrlForNewline={ true }
           onFocus={ this.onFocus }
           onBlur={ this.onBlur }
@@ -120,23 +111,21 @@ export default class DecisionRulesEditorCellComponent extends Component {
 
 class TableCellEditor extends EditableComponent {
 
+  constructor(props, context) {
+    super(props, context);
+
+    this._expressionLanguages = context.injector.get('expressionLanguages');
+    this._translate = context.injector.get('translate');
+  }
+
   isDefaultExpressionLanguage(businessObject) {
     const { expressionLanguage } = businessObject;
 
-    const isInput = is(businessObject, 'dmn:UnaryTests');
+    const defaultExpressionLanguage = this.getDefaultExpressionLanguage(
+      businessObject
+    ).value;
 
-    const {
-      defaultInputExpressionLanguage,
-      defaultOutputExpressionLanguage
-    } = this.context.injector.get('config');
-
-    if (isInput) {
-      return (!expressionLanguage && !defaultInputExpressionLanguage)
-        || expressionLanguage === (defaultInputExpressionLanguage || 'feel');
-    } else {
-      return (!expressionLanguage && !defaultOutputExpressionLanguage)
-        || expressionLanguage === (defaultOutputExpressionLanguage || 'juel');
-    }
+    return !expressionLanguage || expressionLanguage === defaultExpressionLanguage;
   }
 
   getDescription(businessObject) {
@@ -146,27 +135,33 @@ class TableCellEditor extends EditableComponent {
   getExpressionLanguageLabel(businessObject) {
     const { expressionLanguage } = businessObject;
 
-    const isInput = is(businessObject, 'dmn:UnaryTests');
+    const defaultExpressionLanguage = this.getDefaultExpressionLanguage(businessObject);
 
-    if (isInput) {
-      return expressionLanguage
-        ? EXPRESSION_LANGUAGE_LABELS[businessObject.expressionLanguage.toLowerCase()]
-        : 'FEEL';
-    } else {
-      return expressionLanguage
-        ? EXPRESSION_LANGUAGE_LABELS[businessObject.expressionLanguage.toLowerCase()]
-        : 'JUEL';
-    }
+    return this._expressionLanguages.getLabel(expressionLanguage) ||
+      defaultExpressionLanguage.label;
   }
 
   isScript(businessObject) {
+    const defaultExpressionLanguage = this.getDefaultExpressionLanguage(businessObject);
 
-    return (
-      is(businessObject, 'dmn:UnaryTests') && (
-        (businessObject.expressionLanguage || 'FEEL') !== 'FEEL' ||
-        businessObject.text.indexOf('\n') !== -1
-      )
-    );
+    const isInputCell = is(businessObject, 'dmn:UnaryTests');
+
+    if (!isInputCell) {
+      return false;
+    }
+
+    if (businessObject.text.indexOf('\n') !== -1) {
+      return true;
+    }
+
+    return businessObject.expressionLanguage &&
+      businessObject.expressionLanguage !== defaultExpressionLanguage;
+  }
+
+  getDefaultExpressionLanguage(businessObject) {
+    const elementType = is(businessObject, 'dmn:UnaryTests') ? 'inputCell' : 'outputCell';
+
+    return this._expressionLanguages.getDefault(elementType);
   }
 
   render() {
@@ -179,8 +174,7 @@ class TableCellEditor extends EditableComponent {
 
     const isDefaultExpressionLanguage = this.isDefaultExpressionLanguage(businessObject);
 
-    const expressionLanguageLabel = this.getExpressionLanguageLabel(businessObject)
-      || businessObject.expressionLanguage;
+    const expressionLanguageLabel = this.getExpressionLanguageLabel(businessObject);
 
     const isScript = this.isScript(businessObject);
 
@@ -201,7 +195,10 @@ class TableCellEditor extends EditableComponent {
           !isFocussed && (
             <span
               className="dms-badge dmn-expression-language"
-              title={ `Expression Language = ${ expressionLanguageLabel }` }>
+              title={ this._translate(
+                'Expression Language = {expressionLanguageLabel}',
+                { expressionLanguageLabel }
+              ) }>
               <span class="dms-badge-icon dmn-icon-file-code"></span>
               <span class="dms-badge-label">{ expressionLanguageLabel }</span>
             </span>

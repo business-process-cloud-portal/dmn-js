@@ -25,7 +25,9 @@ export default class SimpleModeButtonComponent extends Component {
     const { injector } = context;
 
     const eventBus = this._eventBus = injector.get('eventBus'),
-          simpleMode = injector.get('simpleMode');
+          simpleMode = injector.get('simpleMode'),
+          elementRegistry = context.injector.get('elementRegistry'),
+          expressionLanguages = context.injector.get('expressionLanguages');
 
     this._renderer = injector.get('renderer');
 
@@ -33,7 +35,9 @@ export default class SimpleModeButtonComponent extends Component {
 
     this.updatePosition = this.updatePosition.bind(this);
 
-    eventBus.on('selection.changed', ({ selection }) => {
+    eventBus.on('cellSelection.changed', ({ elementId }) => {
+      const selection = elementRegistry.get(elementId);
+
       if (!selection || !simpleMode.canSimpleEdit(selection)) {
         this.setState({
           isVisible: false
@@ -42,8 +46,6 @@ export default class SimpleModeButtonComponent extends Component {
         return;
       }
 
-      var isDisabled;
-
       this.setState({
         isVisible: true,
         selection
@@ -51,11 +53,9 @@ export default class SimpleModeButtonComponent extends Component {
 
       const expressionLanguage = getExpressionLanguage(selection);
 
-      if (isDefaultExpressionLanguage(selection, expressionLanguage)) {
-        isDisabled = false;
-      } else {
-        isDisabled = true;
-      }
+      const isDisabled = !isDefaultExpressionLanguage(
+        selection, expressionLanguage, expressionLanguages
+      );
 
       this.setState({
         isVisible: true,
@@ -193,10 +193,15 @@ function getExpressionLanguage(cell) {
   return cell.businessObject.expressionLanguage;
 }
 
-function isDefaultExpressionLanguage(cell, expressionLanguage) {
+function isDefaultExpressionLanguage(cell, expressionLanguage, expressionLanguages) {
+  return !expressionLanguage ||
+    expressionLanguage === getDefaultExpressionLanguage(cell, expressionLanguages);
+}
+
+function getDefaultExpressionLanguage(cell, expressionLanguages) {
   if (isInput(cell.col)) {
-    return !expressionLanguage || expressionLanguage === 'feel';
+    return expressionLanguages.getDefault('inputCell').value;
   } else if (isOutput(cell.col)) {
-    return !expressionLanguage || expressionLanguage === 'juel';
+    return expressionLanguages.getDefault('outputCell').value;
   }
 }
